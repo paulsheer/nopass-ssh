@@ -1,55 +1,54 @@
-<pre>
-
-WARNING: DO NOT USE THIS COMMAND OVER THE PUBLIC INTERNET. PRIVATE NETWORKS ONLY.
-
-Usage:
-    nopass-ssh [-string<N> <expected-text>] <ssh-options> <remote> '<shell-script>'
-    nopass-ssh [-h|--help]
-
-    nopass-ssh executes a command on a remote machine by reading the password
-    from stdin, and then invoking ssh. This is different to regular ssh which
-    will never read from stdin. This allows the user to script ssh commands.
-
-    Example <ssh-options>:
-        -l <user>               Specify login name.
-        -X                      Enable X11 forwarding
-
-    <remote>                    IP address or hostname.
-    '<shell-script>'            Script to be execute on <remote> machine.
-    -string0 <expected-y/n>     String on which to send 'yes\r\n' response. Default: '(yes/no)?'
-                                (Trailing whitespace is ignored in ssh output.)
-    -string1 <expected-pass>    String on which to send password response. Default: 'password:'
-                                (Trailing whitespace is ignored in ssh output.)
-    -h, --help                  Print this message.
-
-
-Example 1:
-    $>
-    $> echo 'My-p@ssW_Rd' | nopass-ssh -X -l elizabeth 10.1.23.45 'xterm'
-    $>
     
-
-Example 2:
-    $>
-    $>
-    $> echo 'mY-P@55w0rD' | nopass-ssh -l root 10.1.23.45 'head -1 /etc/passwd ; exit 21 ;'
+    WARNING: DO NOT USE THIS COMMAND OVER THE PUBLIC INTERNET. PRIVATE NETWORKS ONLY.
     
-    root:x:0:0:root:/home/root:/bin/bash
-    $> echo $?
-    21
-    $>
-    $>
-
-Example 3:
-    $>
-    $> ### Show strict and proper handling of nulls and raw binary data:
-    $> echo 'mY-P@55w0rD' |  ./nopass-ssh -l root 10.1.23.45  'cat /bin/bash ; ' | md5sum
-    31fe3883149b4baae31567db4c79f30  -
-    $> echo 'mY-P@55w0rD' |  ./nopass-ssh -l root 10.1.23.45  'cat /bin/bash | md5sum ; '
-    31fe3883149b4baae31567db4c79f30  -
-    $>
-
-
-</pre>
-
-
+    Usage:
+        nopass-ssh [-string<N> <expected-text>] <ssh-options> <remote> '<shell-script>'
+        nopass-ssh [-h|--help]
+    
+        nopass-ssh executes a command on a remote machine by reading the password
+        from stdin, and then invoking ssh. This is different to regular ssh which
+        will never read from stdin. This allows the user to script ssh commands.
+    
+        Example <ssh-options>:
+            -l <user>               Specify login name.
+            -X                      Enable X11 forwarding
+    
+        <remote>                    IP address or hostname.
+        '<shell-script>'            Script to be execute on <remote> machine.
+        -string0 <expected-y/n>     String on which to send 'yes\r\n' response. Default: '(yes/no)?'
+                                    (Trailing whitespace is ignored in ssh output.)
+        -string1 <expected-pass>    String on which to send password response. Default: 'password:'
+                                    (Trailing whitespace is ignored in ssh output.)
+        -h, --help                  Print this message.
+    
+    
+    Example 1:
+        $>
+        $> echo 'My-p@ssW_Rd' | nopass-ssh -X -l elizabeth 10.1.23.45 'xterm'
+        $>
+        
+    
+    Example 2:
+        $>
+        $>
+        $> echo 'mY-P@55w0rD' | nopass-ssh -l root 10.1.23.45 'head -1 /etc/passwd ; exit 21 ;'
+        
+        root:x:0:0:root:/home/root:/bin/bash
+        $> echo $?
+        21
+        $>
+        $>
+    
+    Example 3:
+        $>
+        $> ### Show strict and proper handling of nulls and raw binary data:
+        $> echo 'mY-P@55w0rD' |  ./nopass-ssh -l root 10.1.23.45  'cat /bin/bash ; ' | md5sum
+        31fe3883149b4baae31567db4c79f30  -
+        $> echo 'mY-P@55w0rD' |  ./nopass-ssh -l root 10.1.23.45  'cat /bin/bash | md5sum ; '
+        31fe3883149b4baae31567db4c79f30  -
+        $>
+    
+    
+    
+    
+    
