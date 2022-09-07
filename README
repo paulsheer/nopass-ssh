@@ -8,6 +8,9 @@
         nopass-ssh executes a command on a remote machine by reading the password
         from stdin, and then invoking ssh. This is different to regular ssh which
         will never read from stdin. This allows the user to script ssh commands.
+        This is not for the purposes of general Unix administration; rather, it
+        is useful for, say, if you are trying to pre-configure machines for shipping,
+        or setup virtual machines.
     
         Example <ssh-options>:
             -l <user>               Specify login name.
@@ -58,6 +61,4 @@
         $> echo 'My-p@ssW_Rd' | nopass-ssh -string2 Login-Ok -X -l elizabeth 10.1.23.45 'echo Login-Ok ; echo good ; '
         $>
         
-    
-    
     

@@ -234,6 +234,9 @@ Usage:\n\
     nopass-ssh executes a command on a remote machine by reading the password\n\
     from stdin, and then invoking ssh. This is different to regular ssh which\n\
     will never read from stdin. This allows the user to script ssh commands.\n\
+    This is not for the purposes of general Unix administration; rather, it\n\
+    is useful for, say, if you are trying to pre-configure machines for shipping,\n\
+    or setup virtual machines.\n\
 \n\
     Example <ssh-options>:\n\
         -l <user>               Specify login name.\n\
