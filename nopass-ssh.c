@@ -47,7 +47,7 @@
 #define HAVE_FORKPTY
 #define HAVE_TCGETATTR
 
-int verbose = 0;
+static int verbose = 0;
 
 static void set_termios (int fd)
 {
@@ -222,17 +222,12 @@ int main (int argc, char **argv)
         "(yes/no)?", "password:", NULL,
     };
 
-    if (argc <= 1) {
-        printf ("%s", "Try    nopass-ssh -h\n");
-        exit (1);
-    }
-
     if (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) {
         printf ("%s", "\n\
 WARNING: DO NOT USE THIS COMMAND OVER THE PUBLIC INTERNET. PRIVATE NETWORKS ONLY.\n\
 \n\
 Usage:\n\
-    nopass-ssh [-string<N> <expected-text>] <ssh-options> <remote> '<shell-script>'\n\
+    nopass-ssh [-verbose] [-string<N> <expected-text>] <ssh-options> <remote> '<shell-script>'\n\
     nopass-ssh [-h|--help]\n\
 \n\
     nopass-ssh executes a command on a remote machine by reading the password\n\
@@ -249,6 +244,7 @@ Usage:\n\
                                 (Trailing whitespace is ignored in ssh output.)\n\
     -string1 <expected-pass>    String on which to send password response. Default: 'password:'\n\
                                 (Trailing whitespace is ignored in ssh output.)\n\
+    -verbose                    Debug messages. Can be used more than once.\n\
     -h, --help                  Print this message.\n\
 \n\
 \n\
@@ -282,29 +278,49 @@ Example 3:\n\
         exit(0);
     }
 
-    for (i = 0; expectstring[i]; i++) {
-        if (argc > 1 && !strncmp(argv[1], "-string", 7) && argv[1][7] == (char) ('0' + i)) {
-            argc--;
-            argv++;
-            if (argc < 1) {
-                fprintf (stderr, "Bad command-line option: try nopass-ssh -h\n");
-                exit (1);
+    for (;;) {
+        int found = 0;
+        for (i = 0; expectstring[i]; i++) {
+            if (argc > 1 && !strncmp(argv[1], "-string", 7) && argv[1][7] == (char) ('0' + i)) {
+                found = 1;
+                argc--, argv++;
+                if (argc < 1) {
+                    fprintf (stderr, "Bad command-line option: try nopass-ssh -h\n");
+                    exit (1);
+                }
+                expectstring[i] = (char *) strdup(argv[1]);
+                argc--, argv++;
             }
-            expectstring[i] = (char *) strdup(argv[1]);
-            argc--;
-            argv++;
         }
+        if (argc > 1 && !strcmp(argv[1], "-verbose")) {
+            found = 1;
+            verbose++;
+            argc--, argv++;
+        }
+        if (!found)
+            break;
+    }
+
+    if (argc <= 1) {
+        printf ("%s", "Try    nopass-ssh -h\n");
+        exit (1);
     }
 
     l = read (0, the_password, sizeof (the_password) - 1);
+    if (verbose)
+        printf ("[VERBOSE] read password returned %d\n", l);
     if (l <= 0) {
         ERROR ("reading password from stdin", l);
         exit (1);
     }
 
+
     /* strip cr/newline which normally comes with an echo */
-    while (l > 0 && (the_password[l - 1] == '\r' || the_password[l - 1] == '\n'))
+    while (l > 0 && (the_password[l - 1] == '\r' || the_password[l - 1] == '\n')) {
         l--;
+        if (verbose)
+            printf ("[VERBOSE] stripping trailing \\r or \\n character from password\n");
+    }
     the_password[l] = '\0';
 
     a = (char **) malloc (sizeof (char *) * (argc + 2));
@@ -323,16 +339,25 @@ Example 3:\n\
             buf_chunk = read (in_fd, buf + buf_len, 1);
         else
             buf_chunk = read (in_fd, buf + buf_len, sizeof (buf) - 1 - buf_len);
+        if (verbose >= 3) {
+            if (buf_chunk > 0)
+                printf ("[VERBOSE] read %d bytes, \"%.*s\"\n", buf_chunk, buf_chunk, buf + buf_len);
+            else
+                printf ("[VERBOSE] read returned %d, errno=%d\n", buf_chunk, errno);
+        }
         if (buf_chunk <= 0) {
             if (state >= STATE_SENT_PASS) {
                 pid_t r;
-                int wstatus = 0;
+                int wstatus = 0, exit_code;
                 r = waitpid (child, &wstatus, 0);
                 if (r < 0 || !WIFEXITED (wstatus)) {
                     ERROR ("waiting for ssh process", r);
                     exit (1);
                 }
-                exit (WEXITSTATUS (wstatus));
+                exit_code = WEXITSTATUS (wstatus);
+                if (verbose >= 2)
+                    printf ("[VERBOSE] exitting with code %d\n", exit_code);
+                exit (exit_code);
             }
             ERROR ("reading from ssh process", buf_chunk);
             exit (1);
@@ -345,7 +370,7 @@ Example 3:\n\
         }
         if (endswith (buf, expectstring[0])) {
             if (verbose)
-                printf ("%s yes\n", buf);
+                printf ("[VERBOSE] \"%s yes\"\n", buf);
             int c;
             c = write (out_fd, "yes\r\n", 5);
             if (c <= 0) {
@@ -357,7 +382,7 @@ Example 3:\n\
         }
         if (state == STATE_START && endswith (buf, expectstring[1])) {
             if (verbose)
-                printf ("%s xxxxxxxxx\n", buf);
+                printf ("[VERBOSE] \"%s xxxxxxxxx\"\n", buf);
             int c;
             c = write (out_fd, the_password, strlen (the_password));
             if (c <= 0) {
@@ -371,16 +396,27 @@ Example 3:\n\
             }
             buf_len = 0;
             state = STATE_SENT_PASS;
+            if (verbose >= 2)
+                printf ("[VERBOSE] switching state to STATE_SENT_PASS\n");
             continue;
         }
 
         if (state == STATE_SENT_PASS) {
             /* wait for first newline after sending the password: */
-            if (buf[buf_len - buf_chunk] == '\n')
+            if (buf[buf_len - buf_chunk] == '\n') {
+                if (verbose >= 2)
+                    printf ("[VERBOSE] got newline, switching state to STATE_GOT_NL\n");
                 state = STATE_GOT_NL;
+            }
         } else if (state == STATE_GOT_NL) {
             int c;
             c = write_all (buf + buf_len - buf_chunk, buf_chunk);
+            if (verbose >= 3) {
+                if (c > 0)
+                    printf ("[VERBOSE] wrote %d bytes, \"%.*s\"\n", c, c, buf + buf_len - buf_chunk);
+                else
+                    printf ("[VERBOSE] write returned %d, errno=%d\n", c, errno);
+            }
             if (c <= 0) {
                 ERROR ("writing output", c);
                 exit (1);
