@@ -203,7 +203,8 @@ static int write_all (const char *buf, int l)
 
 enum _state {
     STATE_START,
-    STATE_SENT_PASS,
+    STATE_AUTH_OK,
+    STATE_WAIT,
     STATE_GOT_NL,
 };
 
@@ -218,8 +219,8 @@ int main (int argc, char **argv)
     int i, l;
     enum _state state = STATE_START;
     char **a;
-    const char *expectstring[3] = {
-        "(yes/no)?", "password:", NULL,
+    const char *expectstring[4] = {
+        "(yes/no)?", "password:", "", NULL,
     };
 
     if (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) {
@@ -244,6 +245,10 @@ Usage:\n\
                                 (Trailing whitespace is ignored in ssh output.)\n\
     -string1 <expected-pass>    String on which to send password response. Default: 'password:'\n\
                                 (Trailing whitespace is ignored in ssh output.)\n\
+    -string2 <expected-pass>    Optional string to wait on successful login. Not set by default.\n\
+                                This is useful if you don't know whether ssh will prompt for a\n\
+                                password, such as if there is authentication key configured in\n\
+                                ~/.ssh/authorized_keys\n\
     -verbose                    Debug messages. Can be used more than once.\n\
     -h, --help                  Print this message.\n\
 \n\
@@ -273,6 +278,12 @@ Example 3:\n\
     $> echo 'mY-P@55w0rD' |  ./nopass-ssh -l root 10.1.23.45  'cat /bin/bash | md5sum ; '\n\
     31fe3883149b4baae31567db4c79f30  -\n\
     $>\n\
+\n\
+Example 4:\n\
+    $>\n\
+    $> echo 'My-p@ssW_Rd' | nopass-ssh -string2 Login-Ok -X -l elizabeth 10.1.23.45 'echo Login-Ok ; echo good ; '\n\
+    $>\n\
+    \n\
 \n\
 \n");
         exit(0);
@@ -334,11 +345,9 @@ Example 3:\n\
     buf_len = 0;
 
     for (;;) {
+        const char *p;
         int buf_chunk;
-        if (state == STATE_SENT_PASS)
-            buf_chunk = read (in_fd, buf + buf_len, 1);
-        else
-            buf_chunk = read (in_fd, buf + buf_len, sizeof (buf) - 1 - buf_len);
+        buf_chunk = read (in_fd, buf + buf_len, sizeof (buf) - 1 - buf_len);
         if (verbose >= 3) {
             if (buf_chunk > 0)
                 printf ("[VERBOSE] read %d bytes, \"%.*s\"\n", buf_chunk, buf_chunk, buf + buf_len);
@@ -346,7 +355,7 @@ Example 3:\n\
                 printf ("[VERBOSE] read returned %d, errno=%d\n", buf_chunk, errno);
         }
         if (buf_chunk <= 0) {
-            if (state >= STATE_SENT_PASS) {
+            if (state >= STATE_AUTH_OK) {
                 pid_t r;
                 int wstatus = 0, exit_code;
                 r = waitpid (child, &wstatus, 0);
@@ -364,10 +373,12 @@ Example 3:\n\
         }
         buf_len += buf_chunk;
         buf[buf_len] = '\0';
-        if (strstr (buf, "Permission denied")) {
+
+        if (state < STATE_GOT_NL && strstr (buf, "Permission denied")) {
             fprintf (stderr, "Permission denied\n");
             exit (1);
         }
+
         if (endswith (buf, expectstring[0])) {
             if (verbose)
                 printf ("[VERBOSE] \"%s yes\"\n", buf);
@@ -380,6 +391,7 @@ Example 3:\n\
             buf_len = 0;
             continue;
         }
+
         if (state == STATE_START && endswith (buf, expectstring[1])) {
             if (verbose)
                 printf ("[VERBOSE] \"%s xxxxxxxxx\"\n", buf);
@@ -395,20 +407,41 @@ Example 3:\n\
                 exit (1);
             }
             buf_len = 0;
-            state = STATE_SENT_PASS;
-            if (verbose >= 2)
-                printf ("[VERBOSE] switching state to STATE_SENT_PASS\n");
+            if (expectstring[2][0]) {
+                state = STATE_WAIT;
+                if (verbose >= 2)
+                    printf ("[VERBOSE] switching state to STATE_WAIT\n");
+            } else {
+                state = STATE_AUTH_OK;
+                if (verbose >= 2)
+                    printf ("[VERBOSE] switching state to STATE_AUTH_OK\n");
+            }
             continue;
         }
 
-        if (state == STATE_SENT_PASS) {
-            /* wait for first newline after sending the password: */
-            if (buf[buf_len - buf_chunk] == '\n') {
-                if (verbose >= 2)
-                    printf ("[VERBOSE] got newline, switching state to STATE_GOT_NL\n");
-                state = STATE_GOT_NL;
-            }
-        } else if (state == STATE_GOT_NL) {
+#define SHIFT(n) \
+    do { \
+        memcpy (buf, &buf[(n)], buf_len - (n)); \
+        buf_len = (buf_len - (n)); \
+    } while (0)
+
+        if (expectstring[2][0] && state <= STATE_WAIT && (p = strstr (buf, expectstring[2]))) {
+            p += strlen (expectstring[2]);
+            SHIFT (p - buf);
+            state = STATE_AUTH_OK;
+            if (verbose >= 2)
+                printf ("[VERBOSE] switching state to STATE_AUTH_OK\n");
+        }
+
+        /* wait for first newline after sending the password: */
+        if (state == STATE_AUTH_OK && (p = strchr (buf, '\n'))) {
+            SHIFT (p + 1 - buf);
+            state = STATE_GOT_NL;
+            if (verbose >= 2)
+                printf ("[VERBOSE] got newline, switching state to STATE_GOT_NL\n");
+        }
+
+        if (state == STATE_GOT_NL) {
             int c;
             c = write_all (buf + buf_len - buf_chunk, buf_chunk);
             if (verbose >= 3) {
@@ -425,10 +458,8 @@ Example 3:\n\
 
 #define HALF    ((int) sizeof(buf) / 2)
 
-        if (buf_len > HALF) {
-            memcpy (buf, &buf[HALF], buf_len - HALF);
-            buf_len -= HALF;
-        }
+        if (buf_len > HALF)
+            SHIFT (HALF);
     }
 
     return 1;

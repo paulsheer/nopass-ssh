@@ -2,7 +2,7 @@
     WARNING: DO NOT USE THIS COMMAND OVER THE PUBLIC INTERNET. PRIVATE NETWORKS ONLY.
     
     Usage:
-        nopass-ssh [-string<N> <expected-text>] <ssh-options> <remote> '<shell-script>'
+        nopass-ssh [-verbose] [-string<N> <expected-text>] <ssh-options> <remote> '<shell-script>'
         nopass-ssh [-h|--help]
     
         nopass-ssh executes a command on a remote machine by reading the password
@@ -19,6 +19,11 @@
                                     (Trailing whitespace is ignored in ssh output.)
         -string1 <expected-pass>    String on which to send password response. Default: 'password:'
                                     (Trailing whitespace is ignored in ssh output.)
+        -string2 <expected-pass>    Optional string to wait on successful login. Not set by default.
+                                    This is useful if you don't know whether ssh will prompt for a
+                                    password, such as if there is authentication key configured in
+                                    ~/.ssh/authorized_keys
+        -verbose                    Debug messages. Can be used more than once.
         -h, --help                  Print this message.
     
     
@@ -48,7 +53,11 @@
         31fe3883149b4baae31567db4c79f30  -
         $>
     
-    
+    Example 4:
+        $>
+        $> echo 'My-p@ssW_Rd' | nopass-ssh -string2 Login-Ok -X -l elizabeth 10.1.23.45 'echo Login-Ok ; echo good ; '
+        $>
+        
     
     
     
