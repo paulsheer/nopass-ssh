@@ -8,3 +8,6 @@ nopass-ssh: nopass-ssh.c
 	@echo '   ./nopass-ssh -h'
 
 
+README: nopass-ssh
+	./nopass-ssh -h | sed -e 's/^.*/    \0/' > README
+

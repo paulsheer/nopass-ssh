@@ -208,6 +208,18 @@ enum _state {
     STATE_GOT_NL,
 };
 
+enum _expect_string {
+    EXPSTR_YN = 0,
+    EXPSTR_ALT_YN,
+    EXPSTR_PASS,
+    EXPSTR_LOGIN,
+    EXPSTR_MAX,
+};
+
+struct expect_string {
+    const char *expstr;
+    const char *opt;
+};
 
 int main (int argc, char **argv)
 {
@@ -219,16 +231,19 @@ int main (int argc, char **argv)
     int i, l;
     enum _state state = STATE_START;
     char **a;
-    const char *expectstring[4] = {
-        "(yes/no)?", "password:", "", NULL,
+    struct expect_string expectstring[EXPSTR_MAX + 1] = {
+        {"(yes/no)?", "-string-yn"},
+        {"(yes/no/[fingerprint])?", "-string-alt-yn"},
+        {"password:", "-string-pass"},
+        {"", "-string-login"},
+        {NULL, NULL},
     };
-
     if (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) {
         printf ("%s", "\n\
 WARNING: DO NOT USE THIS COMMAND OVER THE PUBLIC INTERNET. PRIVATE NETWORKS ONLY.\n\
 \n\
 Usage:\n\
-    nopass-ssh [-verbose] [-string<N> <expected-text>] <ssh-options> <remote> '<shell-script>'\n\
+    nopass-ssh [-verbose] [-string... <expected-text>] <ssh-options> <remote> '<shell-script>'\n\
     nopass-ssh [-h|--help]\n\
 \n\
     nopass-ssh executes a command on a remote machine by reading the password\n\
@@ -244,11 +259,13 @@ Usage:\n\
 \n\
     <remote>                    IP address or hostname.\n\
     '<shell-script>'            Script to be execute on <remote> machine.\n\
-    -string0 <expected-y/n>     String on which to send 'yes\\r\\n' response. Default: '(yes/no)?'\n\
+    -string-yn <y/n>            String on which to send 'yes\\r\\n' response. Default: '(yes/no)?'\n\
                                 (Trailing whitespace is ignored in ssh output.)\n\
-    -string1 <expected-pass>    String on which to send password response. Default: 'password:'\n\
+    -string-alt-yn <y/n/x>      Alternative string to -string-yn. Both are checked.\n\
+                                Default: '(yes/no/[fingerprint])?'\n\
+    -string-pass <pass>         String on which to send password response. Default: 'password:'\n\
                                 (Trailing whitespace is ignored in ssh output.)\n\
-    -string2 <expected-pass>    Optional string to wait on successful login. Not set by default.\n\
+    -string-login <login>       Optional string to wait on successful login. Not set by default.\n\
                                 This is useful if you don't know whether ssh will prompt for a\n\
                                 password, such as if there is authentication key configured in\n\
                                 ~/.ssh/authorized_keys\n\
@@ -294,15 +311,13 @@ Example 4:\n\
 
     for (;;) {
         int found = 0;
-        for (i = 0; expectstring[i]; i++) {
-            if (argc > 1 && !strncmp(argv[1], "-string", 7) && argv[1][7] == (char) ('0' + i)) {
+        for (i = 0; expectstring[i].opt; i++) {
+            if (argc > 1 && !strcmp(argv[1], expectstring[i].opt)) {
                 found = 1;
                 argc--, argv++;
-                if (argc < 1) {
-                    fprintf (stderr, "Bad command-line option: try nopass-ssh -h\n");
-                    exit (1);
-                }
-                expectstring[i] = (char *) strdup(argv[1]);
+                if (argc < 1)
+                    goto cmdline_error;
+                expectstring[i].expstr = (const char *) strdup(argv[1]);
                 argc--, argv++;
             }
         }
@@ -311,11 +326,14 @@ Example 4:\n\
             verbose++;
             argc--, argv++;
         }
+        if (!found && argc > 1 && !strncmp(argv[1], "-string", 7))
+            goto cmdline_error;
         if (!found)
             break;
     }
 
     if (argc <= 1) {
+      cmdline_error:
         printf ("%s", "Try    nopass-ssh -h\n");
         exit (1);
     }
@@ -382,7 +400,7 @@ Example 4:\n\
             exit (1);
         }
 
-        if (endswith (buf, expectstring[0])) {
+        if (endswith (buf, expectstring[EXPSTR_YN].expstr) || endswith (buf, expectstring[EXPSTR_ALT_YN].expstr)) {
             if (verbose)
                 printf ("[VERBOSE] \"%s yes\"\n", buf);
             int c;
@@ -395,7 +413,7 @@ Example 4:\n\
             continue;
         }
 
-        if (state == STATE_START && endswith (buf, expectstring[1])) {
+        if (state == STATE_START && endswith (buf, expectstring[EXPSTR_PASS].expstr)) {
             if (verbose)
                 printf ("[VERBOSE] \"%s xxxxxxxxx\"\n", buf);
             int c;
@@ -410,7 +428,7 @@ Example 4:\n\
                 exit (1);
             }
             buf_len = 0;
-            if (expectstring[2][0]) {
+            if (expectstring[EXPSTR_LOGIN].expstr[0]) {
                 state = STATE_WAIT;
                 if (verbose >= 2)
                     printf ("[VERBOSE] switching state to STATE_WAIT\n");
@@ -428,8 +446,8 @@ Example 4:\n\
         buf_len = (buf_len - (n)); \
     } while (0)
 
-        if (expectstring[2][0] && state <= STATE_WAIT && (p = strstr (buf, expectstring[2]))) {
-            p += strlen (expectstring[2]);
+        if (expectstring[EXPSTR_LOGIN].expstr[0] && state <= STATE_WAIT && (p = strstr (buf, expectstring[EXPSTR_LOGIN].expstr))) {
+            p += strlen (expectstring[EXPSTR_LOGIN].expstr);
             SHIFT (p - buf);
             state = STATE_AUTH_OK;
             if (verbose >= 2)
