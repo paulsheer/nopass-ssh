@@ -60,7 +60,7 @@
     
     Example 4:
         $>
-        $> echo 'My-p@ssW_Rd' | nopass-ssh -string2 Login-Ok -X -l elizabeth 10.1.23.45 'echo Login-Ok ; echo good ; '
+        $> echo 'My-p@ssW_Rd' | nopass-ssh -string-login Login-Ok -X -l elizabeth 10.1.23.45 'echo Login-Ok ; echo good ; '
         $>
         
     

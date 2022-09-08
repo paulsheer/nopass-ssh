@@ -301,7 +301,7 @@ Example 3:\n\
 \n\
 Example 4:\n\
     $>\n\
-    $> echo 'My-p@ssW_Rd' | nopass-ssh -string2 Login-Ok -X -l elizabeth 10.1.23.45 'echo Login-Ok ; echo good ; '\n\
+    $> echo 'My-p@ssW_Rd' | nopass-ssh -string-login Login-Ok -X -l elizabeth 10.1.23.45 'echo Login-Ok ; echo good ; '\n\
     $>\n\
     \n\
 \n\
