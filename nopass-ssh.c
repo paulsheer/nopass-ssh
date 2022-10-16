@@ -41,7 +41,11 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#ifdef __FreeBSD__
+#include <libutil.h>
+#else
 #include <pty.h>
+#endif
 
 
 #define HAVE_FORKPTY
