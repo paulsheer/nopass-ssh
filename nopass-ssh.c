@@ -172,7 +172,7 @@ static int endswith (const char *p, const char *s)
         l--;
     if (l < c)
         return 0;
-    return !memcmp (p + l - c, s, c);
+    return !strncasecmp (p + l - c, s, c);
 }
 
 #define ERROR(a,b)      handle_error(__FILE__, __LINE__, a, b)
