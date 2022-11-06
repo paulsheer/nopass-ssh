@@ -235,6 +235,7 @@ int main (int argc, char **argv)
     int i, l;
     enum _state state = STATE_START;
     char **a;
+    int option_scp = 0;
     struct expect_string expectstring[EXPSTR_MAX + 1] = {
         {"(yes/no)?", "-string-yn"},
         {"(yes/no/[fingerprint])?", "-string-alt-yn"},
@@ -248,6 +249,7 @@ WARNING: DO NOT USE THIS COMMAND OVER THE PUBLIC INTERNET. PRIVATE NETWORKS ONLY
 \n\
 Usage:\n\
     nopass-ssh [-verbose] [-string... <expected-text>] <ssh-options> <remote> '<shell-script>'\n\
+    nopass-ssh -scp [-verbose] [-string... <expected-text>] <ssh-options> <from> <to>'\n\
     nopass-ssh [-h|--help]\n\
 \n\
     nopass-ssh executes a command on a remote machine by reading the password\n\
@@ -262,6 +264,8 @@ Usage:\n\
         -X                      Enable X11 forwarding\n\
 \n\
     <remote>                    IP address or hostname.\n\
+    <from>                      scp remote or local source path.\n\
+    <to>                        scp remote or local destination path.\n\
     '<shell-script>'            Script to be execute on <remote> machine.\n\
     -string-yn <y/n>            String on which to send 'yes\\r\\n' response. Default: '(yes/no)?'\n\
                                 (Trailing whitespace is ignored in ssh output.)\n\
@@ -309,6 +313,12 @@ Example 4:\n\
     $>\n\
     \n\
 \n\
+Example 5:\n\
+    $>\n\
+    $> echo 'My-p@ssW_Rd' | nopass-ssh -scp john@192.168.1.1:/home/john/mydoc.txt /home/john/\n\
+    $>\n\
+    \n\
+\n\
 \n");
         exit(0);
     }
@@ -324,6 +334,11 @@ Example 4:\n\
                 expectstring[i].expstr = (const char *) strdup(argv[1]);
                 argc--, argv++;
             }
+        }
+        if (argc > 1 && !strcmp(argv[1], "-scp")) {
+            found = 1;
+            option_scp++;
+            argc--, argv++;
         }
         if (argc > 1 && !strcmp(argv[1], "-verbose")) {
             found = 1;
@@ -360,12 +375,15 @@ Example 4:\n\
     the_password[l] = '\0';
 
     a = (char **) malloc (sizeof (char *) * (argc + 2));
-    a[0] = "ssh";
+    if (option_scp)
+        a[0] = "scp";
+    else
+        a[0] = "ssh";
     for (i = 1; i < argc; i++)
         a[i] = argv[i];
     a[i] = NULL;
 
-    child = open_under_pty (&in_fd, &out_fd, "ssh", a);
+    child = open_under_pty (&in_fd, &out_fd, a[0], a);
 
     buf_len = 0;
 

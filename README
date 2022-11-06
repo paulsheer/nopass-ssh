@@ -3,6 +3,7 @@
     
     Usage:
         nopass-ssh [-verbose] [-string... <expected-text>] <ssh-options> <remote> '<shell-script>'
+        nopass-ssh -scp [-verbose] [-string... <expected-text>] <ssh-options> <from> <to>'
         nopass-ssh [-h|--help]
     
         nopass-ssh executes a command on a remote machine by reading the password
@@ -17,6 +18,8 @@
             -X                      Enable X11 forwarding
     
         <remote>                    IP address or hostname.
+        <from>                      scp remote or local source path.
+        <to>                        scp remote or local destination path.
         '<shell-script>'            Script to be execute on <remote> machine.
         -string-yn <y/n>            String on which to send 'yes\r\n' response. Default: '(yes/no)?'
                                     (Trailing whitespace is ignored in ssh output.)
@@ -61,6 +64,12 @@
     Example 4:
         $>
         $> echo 'My-p@ssW_Rd' | nopass-ssh -string-login Login-Ok -X -l elizabeth 10.1.23.45 'echo Login-Ok ; echo good ; '
+        $>
+        
+    
+    Example 5:
+        $>
+        $> echo 'My-p@ssW_Rd' | nopass-ssh -scp john@192.168.1.1:/home/john/mydoc.txt /home/john/
         $>
         
     
